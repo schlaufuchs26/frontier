@@ -1,0 +1,38 @@
+{
+  "name": "frontend-template",
+  "version": "0.1.0",
+  "description": "Minimal Bun + TypeScript + React template for web projects",
+  "type": "module",
+  "scripts": {
+    "dev": "bun index.html",
+    "build": "rm -rf dist && bun build index.html --outdir dist/ --target browser --minify --define 'process.env.NODE_ENV=\"production\"'",
+    "start": "bun index.html",
+    "tsc": "tsc --pretty --noEmit",
+    "format": "bun scripts/check-biome-config.ts && biome format --write .",
+    "biome": "bun scripts/check-biome-config.ts && biome check --error-on-warnings .",
+    "knip": "knip-bun",
+    "checks": "bun run format && concurrently -g -c auto 'bun run tsc' 'bun run biome' 'bun run knip' 'bun run test'",
+    "test": "bun test",
+    "test:e2e": "playwright test",
+    "test:coverage": "bun test --coverage",
+    "test:ci": "bun test --coverage --coverage-reporter=lcov",
+    "prepare": "git config core.hooksPath .githooks"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.13",
+    "@happy-dom/global-registrator": "^20.10.2",
+    "@playwright/test": "^1.61.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "bun-types": "latest",
+    "concurrently": "^10.0.3",
+    "knip": "^6.16.1",
+    "typescript": "^5.7.0"
+  }
+}
