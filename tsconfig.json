@@ -19,7 +19,15 @@
     "noUnusedParameters": true,
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
-    "types": ["bun-types"]
+    "types": [
+      "bun-types"
+    ]
   },
-  "include": ["*.ts", "*.tsx", "e2e/**/*.ts"]
+  "include": [
+    "*.ts",
+    "*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "e2e/**/*.ts"
+  ]
 }

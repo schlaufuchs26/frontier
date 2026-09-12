@@ -43,7 +43,10 @@ describe("build script", () => {
       // react-dom.development is only part of React's dev build.
       expect(code).not.toContain("react-dom.development");
     }
-    // The dev bundle measured ~975 kB; production sits near 186 kB.
-    expect(bytes).toBeLessThan(400_000);
+    // React's production build is ~186 kB; Frontier adds ~285 kB of map and
+    // border data (generated files in src/data/). Measured 490 kB on
+    // 2026-09-12; the limit sits at 750 kB so a data refresh is not a failure
+    // but a dev build (5x larger) still is.
+    expect(bytes).toBeLessThan(750_000);
   });
 });

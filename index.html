@@ -3,28 +3,205 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bun + TS Template</title>
+  <title>Frontier; land border quiz</title>
+  <meta name="description" content="A map game: find every country that shares a land border with the one you are shown." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦊</text></svg>">
   <style>
     :root {
-      --bg: #0d0d0d;
-      --surface: #1a1a1a;
-      --text: #e0e0e0;
-      --muted: #888;
+      --bg: #0b1016;
+      --surface: #141b24;
+      --surface-2: #1c2530;
+      --text: #e6ebf2;
+      --muted: #8b9aab;
       --accent: #f0a040;
+      --correct: #35c46b;
+      --missed: #e8b93b;
+      --wrong: #e0524f;
+      --target: #5b8cff;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: system-ui, -apple-system, sans-serif;
-      min-height: 100vh;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+    #root { height: 100%; }
+    .app { height: 100%; display: flex; flex-direction: column; }
+
+    /* ---- start + summary screens ---- */
+    .screen {
+      flex: 1;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-    }
-    #root {
+      gap: 0.9rem;
+      padding: 2rem 1.5rem;
+      overflow-y: auto;
       text-align: center;
+    }
+    .screen h1 { font-size: 2.6rem; letter-spacing: -0.02em; }
+    .tagline { color: var(--muted); font-size: 1.05rem; }
+    .how {
+      text-align: left;
+      color: var(--muted);
+      max-width: 30rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      padding-left: 1.2rem;
+    }
+    .how strong { color: var(--text); }
+    .best { color: var(--accent); }
+    .credit { color: #5b6878; font-size: 0.78rem; }
+    .big-score { font-size: 2rem; color: var(--accent); font-weight: 700; }
+    .sub { color: var(--muted); }
+    .missed-block { max-width: 34rem; text-align: left; }
+    .missed-block h3 { font-size: 1rem; margin-bottom: 0.4rem; color: var(--muted); }
+    .missed-block ul {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.9rem;
+      list-style: none;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+
+    /* ---- shared controls ---- */
+    button { font: inherit; cursor: pointer; }
+    .primary {
+      background: var(--accent);
+      color: #1a1206;
+      border: none;
+      border-radius: 8px;
+      padding: 0.7rem 1.4rem;
+      font-weight: 650;
+    }
+    .primary:disabled { opacity: 0.45; cursor: default; }
+    .ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid #2b3644;
+      border-radius: 8px;
+      padding: 0.7rem 1.1rem;
+    }
+    .ghost:hover { color: var(--text); border-color: #3d4b5c; }
+
+    /* ---- round header / reveal panel ---- */
+    .panel {
+      padding: 0.9rem 1rem 1rem;
+      background: var(--surface);
+      border-bottom: 1px solid #222c38;
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .top { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .score, .points { color: var(--accent); font-weight: 700; font-size: 1rem; letter-spacing: 0; }
+    .prompt h2 { font-size: 1.7rem; }
+    .ask { color: var(--muted); font-size: 0.92rem; }
+    .clock {
+      font-variant-numeric: tabular-nums;
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: var(--text);
+      background: var(--surface-2);
+      border-radius: 8px;
+      padding: 0.25rem 0.7rem;
+    }
+    .clock.low { color: var(--wrong); }
+    .picks { display: flex; flex-wrap: wrap; gap: 0.4rem; min-height: 1.9rem; }
+    .hint { color: #5b6878; font-size: 0.85rem; }
+    .chip {
+      background: var(--accent);
+      color: #1a1206;
+      border: none;
+      border-radius: 999px;
+      padding: 0.25rem 0.7rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .actions { justify-content: flex-start; }
+
+    .reveal h2 { font-size: 1.25rem; }
+    .neighbours { display: flex; flex-wrap: wrap; gap: 0.4rem; list-style: none; }
+    .neighbours li {
+      border-radius: 999px;
+      padding: 0.25rem 0.7rem;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .neighbours li.found { background: rgba(53, 196, 107, 0.16); color: var(--correct); border: 1px solid rgba(53, 196, 107, 0.4); }
+    .neighbours li.missed { background: rgba(232, 185, 59, 0.14); color: var(--missed); border: 1px solid rgba(232, 185, 59, 0.4); }
+    .tag { font-size: 0.7rem; text-transform: uppercase; opacity: 0.75; letter-spacing: 0.05em; }
+    .wrong-line { color: var(--wrong); font-size: 0.85rem; }
+    .extras { color: var(--muted); font-size: 0.82rem; }
+    .legend { display: flex; align-items: center; gap: 0.4rem; color: var(--muted); font-size: 0.78rem; }
+    .swatch { width: 0.7rem; height: 0.7rem; border-radius: 3px; display: inline-block; margin-left: 0.6rem; }
+    .swatch.correct { background: var(--correct); }
+    .swatch.missed { background: var(--missed); }
+    .swatch.wrong { background: var(--wrong); }
+
+    /* ---- map ---- */
+    .map { position: relative; flex: 1 1 auto; min-height: 0; background: #0b1016; }
+    .map svg { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+    .map svg:active { cursor: grabbing; }
+    .ocean { fill: #0b1016; }
+    .shape {
+      fill: #2b3541;
+      stroke: #0b1016;
+      stroke-width: 1px;
+      vector-effect: non-scaling-stroke;
+    }
+    .shape.locked { fill: #1b222b; }
+    .shape.clickable { cursor: pointer; }
+    .shape.clickable:hover { fill: #3f4d5e; }
+    .shape.picked { fill: var(--accent); }
+    .shape.correct { fill: var(--correct); }
+    .shape.missed { fill: var(--missed); }
+    .shape.wrong { fill: var(--wrong); }
+    .shape.target { fill: var(--target); stroke: #dce6ff; }
+    .marker {
+      fill: #cfe0f5;
+      stroke: #0b1016;
+      stroke-width: 1px;
+      vector-effect: non-scaling-stroke;
+      pointer-events: none;
+    }
+    .marker.picked { fill: var(--accent); }
+    .marker.correct { fill: var(--correct); }
+    .marker.missed { fill: var(--missed); }
+    .marker.wrong { fill: var(--wrong); }
+    .marker.target { fill: var(--target); }
+    .marker-hit { fill: transparent; cursor: pointer; }
+    .map-controls {
+      position: absolute;
+      right: 0.6rem;
+      bottom: 0.6rem;
+      display: flex;
+      gap: 0.35rem;
+    }
+    .map-controls button {
+      background: rgba(20, 27, 36, 0.85);
+      color: var(--text);
+      border: 1px solid #2b3644;
+      border-radius: 8px;
+      width: 2.2rem;
+      height: 2.2rem;
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+    .map-controls button.world { width: auto; padding: 0 0.7rem; font-size: 0.85rem; }
+    .map-controls button:hover { border-color: #3d4b5c; }
+
+    @media (max-width: 620px) {
+      .prompt h2 { font-size: 1.35rem; }
+      .screen h1 { font-size: 2.1rem; }
     }
   </style>
 </head>

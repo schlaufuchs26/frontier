@@ -1,76 +1,130 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 /**
- * Boot smoke test for the template in a real browser (ticket #1197).
+ * Browser checks for what happy-dom cannot see: real layout (a map that keeps
+ * its height, panels that fit the viewport) and real map interaction. The
+ * happy-dom suite in `tests/` covers the scoring rules and the component
+ * states.
  *
- * The template's job is to prove the stack works end to end: dev server,
- * TSX transpilation, React mount, event handling, CSS layout. The happy-dom
- * suite in `tests/` covers component logic; these checks cover the browser
- * only. When a project grows out of the template, keep this file's shape and
- * swap the assertions for that project's real layout contract; see the
- * AnomalyGuessr suite (game repo, ticket #1193) for a worked example.
- *
- * Laptop viewport: 1366x768 minus browser chrome, the common reviewer size
- * and short enough to catch a layout that only fits a tall window.
+ * Laptop viewport: 1366x768 minus browser chrome. It is short enough to catch
+ * a layout that only fits a tall window.
  */
 
 const LAPTOP = { width: 1280, height: 757 };
+const PHONE = { width: 390, height: 844 };
 
-test("the app boots in a real browser", async ({ page }) => {
+test("the app boots into the intro screen", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
   await page.setViewportSize(LAPTOP);
   await page.goto("/");
 
-  // React mounted into #root and rendered the app; a broken bundle or a
-  // missing TSX transform would leave the element empty.
-  await expect(page.locator("#root")).not.toBeEmpty();
+  await expect(page.getByRole("heading", { name: "Frontier" })).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Bun + TypeScript + React" }),
+    page.getByRole("button", { name: "Start a session" }),
   ).toBeVisible();
-  await expect(page).toHaveTitle("Bun + TS Template");
-
-  // An uncaught exception on load is a failure even if the markup looks fine.
+  await expect(page).toHaveTitle(/Frontier/);
   expect(pageErrors).toEqual([]);
 });
 
-test("the counter button is interactive", async ({ page }) => {
+/**
+ * Click points that the browser says belong to a clickable country, until one
+ * pick sticks. Bounding-box centres are not enough: countries with far-flung
+ * islands (France, Portugal) have hollow centres in the ocean.
+ */
+async function pickACountry(page: Page): Promise<boolean> {
+  const spots = await page.evaluate(() => {
+    const map = document.querySelector(".map");
+    if (!(map instanceof HTMLElement)) return [];
+    const rect = map.getBoundingClientRect();
+    const points: { x: number; y: number }[] = [];
+    for (const path of map.querySelectorAll("path.shape.clickable")) {
+      const box = (path as SVGGraphicsElement).getBoundingClientRect();
+      if (box.width < 3 || box.height < 3) continue;
+      for (let i = 1; i <= 5; i += 1) {
+        for (let j = 1; j <= 5; j += 1) {
+          const x = box.x + (box.width * i) / 6;
+          const y = box.y + (box.height * j) / 6;
+          if (
+            x < rect.x + 8 ||
+            x > rect.right - 8 ||
+            y < rect.y + 8 ||
+            y > rect.bottom - 8
+          ) {
+            continue;
+          }
+          const hit = document.elementFromPoint(x, y);
+          const className = hit?.getAttribute("class") ?? "";
+          if (className.includes("clickable")) points.push({ x, y });
+        }
+      }
+    }
+    return points.slice(0, 40);
+  });
+
+  for (const spot of spots) {
+    await page.mouse.click(spot.x, spot.y);
+    const picks = await page.getByTestId("picks").textContent();
+    if (picks && !picks.includes("No picks yet")) return true;
+  }
+  return false;
+}
+
+test("a round runs on the real map", async ({ page }) => {
   await page.setViewportSize(LAPTOP);
   await page.goto("/");
+  await page.getByRole("button", { name: "Start a session" }).click();
 
-  const button = page.getByRole("button");
-  await expect(button).toHaveText("clicks: 0");
+  await expect(page.getByTestId("target-name")).toBeVisible();
+  await expect(page.getByText(/Find all \d+ land/)).toBeVisible();
 
-  await button.click();
-  await expect(button).toHaveText("clicks: 1");
+  // The map is the point of the game: it must actually have a size.
+  const map = page.getByRole("img", { name: "World map" });
+  await expect(map).toBeVisible();
+  const box = await map.boundingBox();
+  if (!box) throw new Error("the map has no layout box");
+  expect(box.width).toBeGreaterThan(600);
+  expect(box.height).toBeGreaterThan(300);
 
-  await button.click();
-  await expect(button).toHaveText("clicks: 2");
+  // Clicking land picks a country. The map flies to the round's region, so
+  // probe real points inside the viewport instead of naming a country.
+  expect(await pickACountry(page)).toBe(true);
+  await expect(page.getByTestId("picks")).not.toContainText("No picks yet");
+
+  await page.getByRole("button", { name: "Check picks" }).click();
+  await expect(page.getByTestId("reveal")).toBeVisible();
+  await expect(page.getByTestId("neighbour-list")).toBeVisible();
+
+  await page.getByRole("button", { name: /Next round|See results/ }).click();
+  await expect(page.getByTestId("target-name")).toBeVisible();
 });
 
-test("the shell centers the app without overflowing the laptop viewport", async ({
+test("the layout fits a laptop and a phone without scrolling", async ({
   page,
 }) => {
-  await page.setViewportSize(LAPTOP);
-  await page.goto("/");
+  for (const viewport of [LAPTOP, PHONE]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Start a session" }).click();
+    await expect(page.getByTestId("target-name")).toBeVisible();
 
-  // The template's layout contract: content centered on both axes and the
-  // page never scrolls. A stray margin or a 100vw child breaks this.
-  const doc = await page.evaluate(() => {
-    const el = document.scrollingElement;
-    return {
-      scrollWidth: el?.scrollWidth ?? 0,
-      scrollHeight: el?.scrollHeight ?? 0,
-      innerWidth: window.innerWidth,
-      innerHeight: window.innerHeight,
-    };
-  });
-  expect(doc.scrollWidth).toBeLessThanOrEqual(doc.innerWidth);
-  expect(doc.scrollHeight).toBeLessThanOrEqual(doc.innerHeight + 1);
+    const metrics = await page.evaluate(() => {
+      const el = document.scrollingElement;
+      return {
+        scrollWidth: el?.scrollWidth ?? 0,
+        scrollHeight: el?.scrollHeight ?? 0,
+        innerWidth: window.innerWidth,
+        innerHeight: window.innerHeight,
+      };
+    });
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.innerWidth);
+    expect(metrics.scrollHeight).toBeLessThanOrEqual(metrics.innerHeight + 1);
 
-  const root = await page.locator("#root").boundingBox();
-  if (!root) throw new Error("the app root has no layout box");
-  const center = root.x + root.width / 2;
-  expect(Math.abs(center - LAPTOP.width / 2)).toBeLessThanOrEqual(1);
+    const map = await page
+      .getByRole("img", { name: "World map" })
+      .boundingBox();
+    if (!map) throw new Error("the map has no layout box");
+    expect(map.height).toBeGreaterThan(200);
+  }
 });
