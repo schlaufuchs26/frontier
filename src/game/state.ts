@@ -1,24 +1,14 @@
-import type { CellState, Round, RoundResult } from "./types";
+import type { CellState, RoundResult } from "./types";
 
 /**
- * What colour each country gets on the map: the target is marked, picks show
- * while guessing; once the round is scored the result wins over the picks.
+ * What colour each country gets on the reveal map: the target is marked, the
+ * neighbours the player named turn green, the missed ones amber, wrong picks
+ * red. Only ever built from a scored round; the pre-submit screen shows no map.
  */
-export function cellStates(
-  round: Round | null,
-  picks: string[],
-  result: RoundResult | null,
-): Record<string, CellState> {
-  const states: Record<string, CellState> = {};
-  if (round) states[round.target] = "target";
-  if (result) {
-    for (const id of result.found) states[id] = "correct";
-    for (const id of result.missed) states[id] = "missed";
-    for (const id of result.wrong) states[id] = "wrong";
-    return states;
-  }
-  for (const id of picks) {
-    if (states[id] !== "target") states[id] = "picked";
-  }
+export function cellStates(result: RoundResult): Record<string, CellState> {
+  const states: Record<string, CellState> = { [result.target]: "target" };
+  for (const id of result.found) states[id] = "correct";
+  for (const id of result.missed) states[id] = "missed";
+  for (const id of result.wrong) states[id] = "wrong";
   return states;
 }

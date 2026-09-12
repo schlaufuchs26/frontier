@@ -11,11 +11,21 @@ function targetCountry() {
   return country;
 }
 
-function clickCountry(id: string) {
+/** Type a full country name and take its row from the suggestion list. */
+function typeCountry(id: string) {
+  const country = countryById(id);
+  if (!country) throw new Error(`unknown country ${id}`);
+  const input = screen.getByTestId("guess-input");
+  fireEvent.change(input, { target: { value: country.name } });
+  fireEvent.click(screen.getByTestId(`suggestion-${id}`));
+}
+
+/** Shapes are not drawn for micro-states (Liechtenstein, Monaco, ...): they
+ * get a dot marker instead, and that marker carries the state class too. */
+function mapClass(id: string): string {
   const element =
-    screen.queryByTestId(`shape-${id}`) ??
-    screen.getByTestId(`marker-hit-${id}`);
-  fireEvent.click(element);
+    screen.queryByTestId(`shape-${id}`) ?? screen.getByTestId(`marker-${id}`);
+  return element.getAttribute("class") ?? "";
 }
 
 function startSession() {
@@ -30,29 +40,48 @@ describe("App", () => {
     expect(screen.queryByTestId("reveal")).toBeNull();
   });
 
+  test("shows no map and no country shapes before submitting", () => {
+    const { container } = render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: /start a session/i }));
+    expect(screen.getByTestId("round-panel")).toBeInTheDocument();
+    // The answer must not be readable off the screen: no SVG, no shapes.
+    expect(container.querySelector("svg")).toBeNull();
+    expect(screen.queryByRole("img", { name: "World map" })).toBeNull();
+    expect(container.querySelector(".shape")).toBeNull();
+    expect(screen.queryByTestId("shape-DEU")).toBeNull();
+    expect(screen.queryByTestId("marker-VAT")).toBeNull();
+  });
+
   test("plays a full session and scores a clean run", () => {
     startSession();
     for (let round = 0; round < ROUNDS_PER_SESSION; round += 1) {
       const country = targetCountry();
       expect(
         screen.getByText(
-          `Find all ${country.neighbours.length} land ${
-            country.neighbours.length === 1 ? "neighbour" : "neighbours"
-          }`,
+          new RegExp(`Name all ${country.neighbours.length} land`),
         ),
       ).toBeInTheDocument();
+      expect(screen.queryByRole("img", { name: "World map" })).toBeNull();
 
-      for (const neighbour of country.neighbours) clickCountry(neighbour);
+      for (const neighbour of country.neighbours) typeCountry(neighbour);
       const picks = screen.getByTestId("picks");
       expect(picks.textContent).toContain(
         countryById(country.neighbours[0] ?? "")?.name ?? "",
       );
 
-      fireEvent.click(screen.getByRole("button", { name: /check picks/i }));
+      fireEvent.click(screen.getByTestId("submit"));
       expect(screen.getByTestId("reveal")).toBeInTheDocument();
       expect(screen.getByTestId("neighbour-list").textContent).not.toContain(
         "missed",
       );
+      // The reveal is where the map appears, coloured by the result.
+      expect(
+        screen.getByRole("img", { name: "World map" }),
+      ).toBeInTheDocument();
+      expect(mapClass(country.id)).toContain("target");
+      for (const neighbour of country.neighbours) {
+        expect(mapClass(neighbour)).toContain("correct");
+      }
 
       fireEvent.click(
         screen.getByRole("button", {
@@ -60,6 +89,7 @@ describe("App", () => {
             round + 1 === ROUNDS_PER_SESSION ? /see results/i : /next round/i,
         }),
       );
+      expect(screen.queryByRole("img", { name: "World map" })).toBeNull();
     }
 
     expect(screen.getByTestId("summary")).toBeInTheDocument();
@@ -69,7 +99,7 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
-  test("wrong picks are reported and can be undone", () => {
+  test("wrong picks are reported, coloured on the map and can be undone", () => {
     startSession();
     const country = targetCountry();
     const outsider = ALL_COUNTRIES.find(
@@ -81,9 +111,9 @@ describe("App", () => {
     );
     if (!outsider) throw new Error("no outsider country found");
 
-    clickCountry(outsider.id);
+    typeCountry(outsider.id);
     expect(screen.getByTestId("picks").textContent).toContain(outsider.name);
-    // clicking the chip removes the pick again
+    // clicking the chip removes the name again
     fireEvent.click(
       screen.getByRole("button", { name: new RegExp(`${outsider.name}`) }),
     );
@@ -91,31 +121,32 @@ describe("App", () => {
       outsider.name,
     );
 
-    clickCountry(outsider.id);
-    fireEvent.click(screen.getByRole("button", { name: /check picks/i }));
+    typeCountry(outsider.id);
+    fireEvent.click(screen.getByTestId("submit"));
     expect(screen.getByTestId("wrong-line").textContent).toContain(
       outsider.name,
     );
     expect(screen.getByTestId("round-points").textContent).toBe("+0");
+    expect(mapClass(outsider.id)).toContain("wrong");
   });
 
-  test("giving up reveals the answer", () => {
+  test("submitting with no names reveals every neighbour", () => {
     startSession();
     const country = targetCountry();
-    fireEvent.click(screen.getByRole("button", { name: /give up/i }));
+    fireEvent.click(screen.getByTestId("submit"));
     const list = screen.getByTestId("neighbour-list");
     for (const neighbour of country.neighbours) {
       expect(list.textContent).toContain(countryById(neighbour)?.name ?? "");
     }
+    for (const neighbour of country.neighbours) {
+      expect(mapClass(neighbour)).toContain("missed");
+    }
     expect(screen.getByTestId("round-points").textContent).toBe("+0");
   });
 
-  test("the check button waits for a pick", () => {
+  test("the round can be submitted without a pick", () => {
     startSession();
-    const check = screen.getByRole("button", { name: /check picks/i });
-    expect(check).toBeDisabled();
-    const country = targetCountry();
-    clickCountry(country.neighbours[0] ?? "");
-    expect(screen.getByRole("button", { name: /check picks/i })).toBeEnabled();
+    expect(screen.getByTestId("submit")).toBeEnabled();
+    expect(screen.getByTestId("picks").textContent).toContain("No names yet");
   });
 });

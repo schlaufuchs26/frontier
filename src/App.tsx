@@ -27,6 +27,10 @@ type Phase = "start" | "play" | "reveal" | "summary";
 
 const MARKERS = markerCountries();
 
+function ignored() {
+  /* the reveal map takes no clicks */
+}
+
 export function App() {
   const [phase, setPhase] = useState<Phase>("start");
   const [rounds, setRounds] = useState<Round[]>([]);
@@ -83,19 +87,20 @@ export function App() {
     setPhase("summary");
   }, [index, rounds.length, results]);
 
-  const togglePick = useCallback(
+  const addPick = useCallback(
     (id: string) => {
       if (phase !== "play" || !round || id === round.target) return;
       setPicks((current) =>
-        current.includes(id)
-          ? current.filter((pick) => pick !== id)
-          : [...current, id],
+        current.includes(id) ? current : [...current, id],
       );
     },
     [phase, round],
   );
 
-  const states = cellStates(round, picks, result);
+  const removePick = useCallback((id: string) => {
+    setPicks((current) => current.filter((pick) => pick !== id));
+  }, []);
+
   const fitBox = useMemo(
     () => (round ? fitView([round.target, ...round.neighbours]) : null),
     [round],
@@ -110,14 +115,16 @@ export function App() {
         <RoundPanel
           index={index}
           total={rounds.length}
+          targetId={round.target}
           targetName={target.name}
+          region={target.region}
           neighbourCount={round.neighbours.length}
           picks={picks.map((id) => ({ id, name: nameOf(id) }))}
           secondsLeft={secondsLeft}
           score={score}
-          onTogglePick={togglePick}
-          onCheck={() => finish(secondsLeft)}
-          onGiveUp={() => finish(0)}
+          onPick={addPick}
+          onRemovePick={removePick}
+          onSubmit={() => finish(secondsLeft)}
         />
       ) : null}
 
@@ -131,12 +138,12 @@ export function App() {
         />
       ) : null}
 
-      {phase === "play" || phase === "reveal" ? (
+      {phase === "reveal" && result ? (
         <WorldMap
-          states={states}
+          states={cellStates(result)}
           markers={MARKERS}
-          interactive={phase === "play"}
-          onToggle={togglePick}
+          interactive={false}
+          onToggle={ignored}
           fitBox={fitBox}
           fitKey={index}
         />

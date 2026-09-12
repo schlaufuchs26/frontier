@@ -13,13 +13,14 @@ export function StartScreen({ best, onStart }: Props) {
         How well do you know the world&apos;s land borders?
       </p>
       <ol className="how">
-        <li>Each round names one country.</li>
+        <li>Each round names one country, and no map: from memory.</li>
         <li>
-          Click every country that shares a <strong>land border</strong> with
-          it.
+          Type every country that shares a <strong>land border</strong> with it,
+          then press Done.
         </li>
         <li>
-          Land only: islands and overseas territories never count, but the
+          The debrief shows the map with the borders you missed and the names
+          that were wrong; islands and overseas territories never count, but the
           debrief calls them out.
         </li>
       </ol>

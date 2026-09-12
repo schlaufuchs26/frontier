@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Frontier; land border quiz</title>
-  <meta name="description" content="A map game: find every country that shares a land border with the one you are shown." />
+  <meta name="description" content="A memory quiz: name every country that shares a land border with the one you are shown, then see the map." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦊</text></svg>">
   <style>
     :root {
@@ -125,6 +125,53 @@
       font-weight: 600;
     }
     .actions { justify-content: flex-start; }
+
+    /* ---- play screen: type the neighbours, no map yet ---- */
+    .play { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    .guesser { display: flex; flex-direction: column; gap: 0.3rem; max-width: 30rem; }
+    .guess {
+      font: inherit;
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid #2b3644;
+      border-radius: 8px;
+      padding: 0.55rem 0.8rem;
+      width: 100%;
+    }
+    .guess::placeholder { color: #5b6878; }
+    .guess:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .suggestions {
+      list-style: none;
+      background: #232f3d;
+      border: 1px solid #38465a;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+    }
+    .suggestions li { display: flex; }
+    .suggestions button {
+      flex: 1;
+      text-align: left;
+      background: none;
+      border: none;
+      color: var(--text);
+      padding: 0.4rem 0.8rem;
+      font-size: 0.92rem;
+    }
+    .suggestions button.active { background: #2a3646; }
+    .suggestions button:hover { background: #24303e; }
+    .no-match { color: #5b6878; font-size: 0.85rem; }
+    .stage {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      background:
+        radial-gradient(circle at 50% 40%, #101923 0%, var(--bg) 70%);
+    }
+    .stage-note { color: #46535f; font-size: 0.9rem; text-align: center; max-width: 22rem; }
 
     .reveal h2 { font-size: 1.25rem; }
     .neighbours { display: flex; flex-wrap: wrap; gap: 0.4rem; list-style: none; }
