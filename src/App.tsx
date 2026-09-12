@@ -27,10 +27,6 @@ type Phase = "start" | "play" | "reveal" | "summary";
 
 const MARKERS = markerCountries();
 
-function ignored() {
-  /* the reveal map takes no clicks */
-}
-
 export function App() {
   const [phase, setPhase] = useState<Phase>("start");
   const [rounds, setRounds] = useState<Round[]>([]);
@@ -142,8 +138,6 @@ export function App() {
         <WorldMap
           states={cellStates(result)}
           markers={MARKERS}
-          interactive={false}
-          onToggle={ignored}
           fitBox={fitBox}
           fitKey={index}
         />

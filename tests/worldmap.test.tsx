@@ -8,65 +8,42 @@ const markers = markerCountries();
 
 function renderMap(options: {
   states?: Record<string, CellState>;
-  interactive?: boolean;
   fitBox?: { x: number; y: number; w: number; h: number } | null;
   fitKey?: number;
-  onToggle?: (id: string) => void;
 }) {
-  const calls: string[] = [];
-  const onToggle = options.onToggle ?? ((id: string) => calls.push(id));
   render(
     <WorldMap
       states={options.states ?? {}}
       markers={markers}
-      interactive={options.interactive ?? true}
-      onToggle={onToggle}
       fitBox={options.fitBox ?? null}
       fitKey={options.fitKey ?? 0}
     />,
   );
-  return calls;
 }
 
 describe("WorldMap", () => {
-  test("draws clickable shapes and dot markers", () => {
+  test("draws the country shapes and the dot markers", () => {
     renderMap({});
     expect(screen.getByTestId("shape-DEU")).toBeInTheDocument();
-    expect(screen.getByTestId("shape-DEU").getAttribute("class")).toContain(
-      "clickable",
-    );
     expect(screen.getByTestId("marker-VAT")).toBeInTheDocument();
     expect(screen.getByRole("img")).toHaveAttribute("aria-label", "World map");
   });
 
-  test("clicking a country reports it, scenery stays inert", () => {
-    const calls = renderMap({});
-    fireEvent.click(screen.getByTestId("shape-DEU"));
-    expect(calls).toEqual(["DEU"]);
-    fireEvent.click(screen.getByTestId("shape-GRL"));
-    expect(calls).toEqual(["DEU"]);
-  });
-
-  test("the target country cannot be picked", () => {
-    const calls = renderMap({ states: { DEU: "target" } });
-    fireEvent.click(screen.getByTestId("shape-DEU"));
-    expect(calls).toEqual([]);
+  test("colours the scored countries and leaves scenery locked", () => {
+    renderMap({ states: { DEU: "target", FRA: "correct", GRL: "wrong" } });
     expect(screen.getByTestId("shape-DEU").getAttribute("class")).toContain(
       "target",
     );
-  });
-
-  test("marker dots are clickable while playing", () => {
-    const calls = renderMap({});
-    fireEvent.click(screen.getByTestId("marker-hit-VAT"));
-    expect(calls).toEqual(["VAT"]);
-  });
-
-  test("nothing is clickable after the round ends", () => {
-    const calls = renderMap({ interactive: false });
-    fireEvent.click(screen.getByTestId("shape-DEU"));
-    expect(calls).toEqual([]);
-    expect(screen.queryByTestId("marker-hit-VAT")).toBeNull();
+    expect(screen.getByTestId("shape-FRA").getAttribute("class")).toContain(
+      "correct",
+    );
+    // Greenland is scenery, not a game entity: it never takes a state colour.
+    expect(screen.getByTestId("shape-GRL").getAttribute("class")).toContain(
+      "locked",
+    );
+    expect(screen.getByTestId("marker-VAT").getAttribute("class")).toContain(
+      "idle",
+    );
   });
 
   test("zoom controls and the world button move the view", () => {
@@ -96,19 +73,18 @@ describe("WorldMap", () => {
 });
 
 describe("WorldMap interaction", () => {
-  test("dragging pans the map and suppresses the click", () => {
-    const calls = renderMap({});
+  test("dragging pans the map", () => {
+    renderMap({});
     const svg = screen.getByRole("img");
     fireEvent.click(screen.getByLabelText("Zoom in"));
     const before = svg.getAttribute("viewBox");
     fireEvent.pointerDown(svg, { clientX: 100, clientY: 100 });
     fireEvent.pointerMove(svg, { clientX: 40, clientY: 100 });
     expect(svg.getAttribute("viewBox")).not.toBe(before);
-    fireEvent.click(screen.getByTestId("shape-DEU"));
-    expect(calls).toEqual([]);
     fireEvent.pointerUp(svg);
-    fireEvent.click(screen.getByTestId("shape-DEU"));
-    expect(calls).toEqual(["DEU"]);
+    const after = svg.getAttribute("viewBox");
+    fireEvent.pointerMove(svg, { clientX: 10, clientY: 10 });
+    expect(svg.getAttribute("viewBox")).toBe(after);
   });
 
   test("the wheel zooms around the cursor", () => {

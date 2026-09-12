@@ -9,10 +9,9 @@ import {
 import type { CellState, Country, View } from "../game/types";
 
 interface Props {
+  /** Colour per country id, built from a scored round (see game/state.ts). */
   states: Record<string, CellState>;
   markers: Country[];
-  interactive: boolean;
-  onToggle: (id: string) => void;
   /** When `fitKey` changes, the map flies to `fitBox`. */
   fitBox: View | null;
   fitKey: number;
@@ -20,19 +19,17 @@ interface Props {
 
 const FALLBACK_ASPECT = 2;
 
-export function WorldMap({
-  states,
-  markers,
-  interactive,
-  onToggle,
-  fitBox,
-  fitKey,
-}: Props) {
+/**
+ * The reveal surface: SVG shapes for every country, drag to pan and wheel or
+ * buttons to zoom. It takes no answers; the round is already scored by the
+ * time this renders (ticket #1327 moved the map out of the round).
+ */
+export function WorldMap({ states, markers, fitBox, fitKey }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>(WORLD_VIEW);
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
-  const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  const drag = useRef<{ x: number; y: number } | null>(null);
   const manual = useRef(false);
 
   const aspect = width > 0 && height > 0 ? width / height : FALLBACK_ASPECT;
@@ -67,7 +64,6 @@ export function WorldMap({
 
   const pixelsPerUnit = width > 0 && view.w > 0 ? width / view.w : 0;
   const markerRadius = pixelsPerUnit > 0 ? 5 / pixelsPerUnit : 0.6;
-  const markerHitRadius = pixelsPerUnit > 0 ? 12 / pixelsPerUnit : 1.4;
 
   // Layout size with fallbacks: happy-dom has no layout engine, so tests need
   // a sensible pixel size for drag and wheel maths.
@@ -107,9 +103,7 @@ export function WorldMap({
   }, [view, zoomAt, sizeOf]);
 
   const onPointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
-    // No setPointerCapture: it would retarget the follow-up click event to the
-    // SVG and swallow country clicks in real browsers.
-    drag.current = { x: event.clientX, y: event.clientY, moved: false };
+    drag.current = { x: event.clientX, y: event.clientY };
   };
 
   const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
@@ -117,8 +111,6 @@ export function WorldMap({
     if (!start) return;
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
-    if (Math.abs(dx) + Math.abs(dy) > 4) start.moved = true;
-    if (!start.moved) return;
     manual.current = true;
     start.x = event.clientX;
     start.y = event.clientY;
@@ -133,14 +125,7 @@ export function WorldMap({
   };
 
   const endDrag = () => {
-    const moved = drag.current?.moved ?? false;
     drag.current = null;
-    return moved;
-  };
-
-  const handleCountryClick = (id: string) => {
-    if (drag.current?.moved) return;
-    onToggle(id);
   };
 
   return (
@@ -157,56 +142,27 @@ export function WorldMap({
       >
         <rect x={-360} y={-180} width={1080} height={540} className="ocean" />
         <g>
-          {ALL_SHAPES.map((shape) => {
-            const state = states[shape.id] ?? "idle";
-            const canClick =
-              interactive && shape.clickable === true && state !== "target";
-            return (
-              // biome-ignore lint/a11y/noStaticElementInteractions: map shapes are the game's buttons
-              <path
-                key={shape.id}
-                d={shape.d}
-                data-testid={`shape-${shape.id}`}
-                className={`shape ${shape.clickable ? state : "locked"}${
-                  canClick ? " clickable" : ""
-                }`}
-                onClick={
-                  canClick ? () => handleCountryClick(shape.id) : undefined
-                }
-              />
-            );
-          })}
+          {ALL_SHAPES.map((shape) => (
+            <path
+              key={shape.id}
+              d={shape.d}
+              data-testid={`shape-${shape.id}`}
+              className={`shape ${
+                shape.clickable ? (states[shape.id] ?? "idle") : "locked"
+              }`}
+            />
+          ))}
         </g>
-        {markers.map((country) => {
-          const state = states[country.id] ?? "idle";
-          const canClick = interactive && state !== "target";
-          return (
-            <g key={`marker-${country.id}`}>
-              {/* biome-ignore lint/a11y/noStaticElementInteractions: dot markers are click targets for micro-states */}
-              <circle
-                cx={country.marker[0]}
-                cy={country.marker[1]}
-                r={markerRadius}
-                data-testid={`marker-${country.id}`}
-                className={`marker ${state}`}
-                onClick={
-                  canClick ? () => handleCountryClick(country.id) : undefined
-                }
-              />
-              {canClick ? (
-                // biome-ignore lint/a11y/noStaticElementInteractions: enlarged hit area for the marker above
-                <circle
-                  cx={country.marker[0]}
-                  cy={country.marker[1]}
-                  r={markerHitRadius}
-                  className="marker-hit"
-                  data-testid={`marker-hit-${country.id}`}
-                  onClick={() => handleCountryClick(country.id)}
-                />
-              ) : null}
-            </g>
-          );
-        })}
+        {markers.map((country) => (
+          <circle
+            key={`marker-${country.id}`}
+            cx={country.marker[0]}
+            cy={country.marker[1]}
+            r={markerRadius}
+            data-testid={`marker-${country.id}`}
+            className={`marker ${states[country.id] ?? "idle"}`}
+          />
+        ))}
       </svg>
       <div className="map-controls">
         <button

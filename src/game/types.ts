@@ -48,13 +48,7 @@ export interface RoundResult {
   points: number;
 }
 
-export type CellState =
-  | "idle"
-  | "picked"
-  | "correct"
-  | "wrong"
-  | "missed"
-  | "target";
+export type CellState = "idle" | "correct" | "wrong" | "missed" | "target";
 
 export interface View {
   x: number;

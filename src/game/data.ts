@@ -19,7 +19,7 @@ export function nameOf(id: string): string {
   return COUNTRY_BY_ID.get(id)?.name ?? id;
 }
 
-/** Small shapes are unclickable at world zoom, so they get a dot marker. */
+/** Shapes too small to read at world zoom get a dot marker instead. */
 export function markerCountries(): Country[] {
   return COUNTRIES.filter((c) => needsMarker(c));
 }
